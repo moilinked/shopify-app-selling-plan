@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"time"
 
-	"shopifyapp-authentication/internal/config"
-	"shopifyapp-authentication/internal/httpapi"
+	"shopify-app-authentication/internal/config"
+	"shopify-app-authentication/internal/httpapi"
 )
 
 func main() {

@@ -9,7 +9,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/golang-jwt/jwt/v5"
-	"shopifyapp-authentication/internal/config"
+	"shopify-app-authentication/internal/config"
 )
 
 type contextKey string

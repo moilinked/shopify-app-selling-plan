@@ -1,4 +1,4 @@
-## shopifyapp-authentication demo (go-chi)
+## shopify-app-authentication demo (go-chi)
 
 ### Doc
 [shopify-session-tokens](https://shopify.dev/docs/apps/build/authentication-authorization/session-tokens)
@@ -6,7 +6,7 @@
 ### Run
 
 ```bash
-cd shopifyapp-authentication
+cd shopify-app-authentication
 go run ./cmd/server -config ./config/config.yaml
 ```
 

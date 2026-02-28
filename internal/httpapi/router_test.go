@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"shopifyapp-authentication/internal/config"
+	"shopify-app-authentication/internal/config"
 
 	"github.com/golang-jwt/jwt/v5"
 )

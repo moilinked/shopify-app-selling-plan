@@ -1,4 +1,4 @@
-module shopifyapp-authentication
+module shopify-app-authentication
 
 go 1.25.3
 

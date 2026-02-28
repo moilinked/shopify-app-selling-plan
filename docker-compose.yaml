@@ -1,9 +1,9 @@
 services:
-  shopifyapp-auth:
+  shopify-app-auth:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: shopifyapp-auth
+    container_name: shopify-app-auth
     ports:
       - "${PORT:-9998}:9998"
     volumes:

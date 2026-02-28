@@ -1,4 +1,4 @@
-## shopify-app-authentication demo (go-chi)
+## shopify-app-authentication (go-chi)
 
 ### Doc
 [shopify-session-tokens](https://shopify.dev/docs/apps/build/authentication-authorization/session-tokens)

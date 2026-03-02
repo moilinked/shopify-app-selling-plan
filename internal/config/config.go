@@ -12,6 +12,7 @@ type Config struct {
 	Port             string `yaml:"port"`
 	ShopifyAPIKey    string `yaml:"shopify_api_key"`
 	ShopifyAPISecret string `yaml:"shopify_api_secret"`
+	DebugAuth        bool   `yaml:"debug_auth"`
 }
 
 func Load(path string) (Config, error) {

@@ -6,10 +6,11 @@ import (
 	"log"
 	"net/http"
 
+	"shopify-app-authentication/internal/config"
+
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/golang-jwt/jwt/v5"
-	"shopify-app-authentication/internal/config"
 )
 
 type contextKey string
@@ -29,14 +30,25 @@ func NewRouter(cfg config.Config) http.Handler {
 		_, _ = w.Write([]byte("pong"))
 	})
 
-	r.With(ShopifySessionTokenMiddleware(cfg.ShopifyAPIKey, cfg.ShopifyAPISecret)).Get("/protected/ping", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json; charset=utf-8")
-		claims, _ := r.Context().Value(shopifyClaimsContextKey).(jwt.MapClaims)
-		body, _ := json.Marshal(map[string]interface{}{
-			"ok":     true,
-			"claims": claims,
+	r.Route("/admin", func(admin chi.Router) {
+		admin.Use(ShopifySessionTokenMiddleware(cfg.ShopifyAPIKey, cfg.ShopifyAPISecret, cfg.DebugAuth))
+		admin.Get("/ping", func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json; charset=utf-8")
+			claims, _ := r.Context().Value(shopifyClaimsContextKey).(jwt.MapClaims)
+			body, _ := json.Marshal(map[string]interface{}{
+				"ok":     true,
+				"claims": claims,
+			})
+			_, _ = w.Write(body)
 		})
-		_, _ = w.Write(body)
+	})
+
+	r.Route("/app", func(app chi.Router) {
+		app.Use(ShopifyAppProxySignatureMiddleware(cfg.ShopifyAPISecret, cfg.DebugAuth))
+		app.Get("/ping", func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Content-Type", "application/json; charset=utf-8")
+			_, _ = w.Write([]byte(`{"ok":true}`))
+		})
 	})
 
 	return r

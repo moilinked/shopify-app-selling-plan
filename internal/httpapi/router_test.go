@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -101,7 +102,7 @@ func makeValidShopifySessionToken(t *testing.T, apiKey, apiSecret string) string
 	return signed
 }
 
-func TestProtectedRouteRequiresJWT(t *testing.T) {
+func TestAdminRouteRequiresJWT(t *testing.T) {
 	cfg := config.Config{
 		Port:             "9998",
 		ShopifyAPIKey:    "test-key",
@@ -110,9 +111,9 @@ func TestProtectedRouteRequiresJWT(t *testing.T) {
 	srv := httptest.NewServer(NewRouter(cfg))
 	t.Cleanup(srv.Close)
 
-	resp, err := http.Get(srv.URL + "/protected/ping")
+	resp, err := http.Get(srv.URL + "/admin/ping")
 	if err != nil {
-		t.Fatalf("GET /protected/ping: %v", err)
+		t.Fatalf("GET /admin/ping: %v", err)
 	}
 	defer resp.Body.Close()
 
@@ -121,7 +122,7 @@ func TestProtectedRouteRequiresJWT(t *testing.T) {
 	}
 }
 
-func TestProtectedRouteAcceptsValidJWTAndLogsClaims(t *testing.T) {
+func TestAdminRouteAcceptsValidJWTAndLogsClaims(t *testing.T) {
 	const apiKey = "test-key"
 	const apiSecret = "test-secret"
 
@@ -129,6 +130,7 @@ func TestProtectedRouteAcceptsValidJWTAndLogsClaims(t *testing.T) {
 		Port:             "9998",
 		ShopifyAPIKey:    apiKey,
 		ShopifyAPISecret: apiSecret,
+		DebugAuth:        true,
 	}
 
 	var buf bytes.Buffer
@@ -142,7 +144,7 @@ func TestProtectedRouteAcceptsValidJWTAndLogsClaims(t *testing.T) {
 	t.Cleanup(srv.Close)
 
 	token := makeValidShopifySessionToken(t, apiKey, apiSecret)
-	req, err := http.NewRequest(http.MethodGet, srv.URL+"/protected/ping", nil)
+	req, err := http.NewRequest(http.MethodGet, srv.URL+"/admin/ping", nil)
 	if err != nil {
 		t.Fatalf("new request: %v", err)
 	}
@@ -150,7 +152,7 @@ func TestProtectedRouteAcceptsValidJWTAndLogsClaims(t *testing.T) {
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		t.Fatalf("GET /protected/ping: %v", err)
+		t.Fatalf("GET /admin/ping: %v", err)
 	}
 	defer resp.Body.Close()
 
@@ -162,5 +164,59 @@ func TestProtectedRouteAcceptsValidJWTAndLogsClaims(t *testing.T) {
 	logOutput := buf.String()
 	if !strings.Contains(logOutput, "shopify_session_token claims=") {
 		t.Fatalf("expected claims log, got %q", logOutput)
+	}
+}
+
+func makeSignedAppProxyQuery(secret string) string {
+	values := url.Values{}
+	values.Set("shop", "devloop-4.myshopify.com")
+	values.Set("logged_in_customer_id", "89466365215417")
+	values.Set("path_prefix", "/apps/my-app-test")
+	values.Set("timestamp", "1772420951")
+
+	signature := computeSHA256HMACHex(canonicalizeProxyParams(values), secret)
+	values.Set("signature", signature)
+	return values.Encode()
+}
+
+func TestAppProxyRouteRequiresValidSignature(t *testing.T) {
+	const apiSecret = "test-secret"
+
+	cfg := config.Config{
+		Port:             "9998",
+		ShopifyAPIKey:    "test-key",
+		ShopifyAPISecret: apiSecret,
+	}
+	srv := httptest.NewServer(NewRouter(cfg))
+	t.Cleanup(srv.Close)
+
+	resp, err := http.Get(srv.URL + "/app/ping")
+	if err != nil {
+		t.Fatalf("GET /app/ping: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("status: got %d, want %d", resp.StatusCode, http.StatusUnauthorized)
+	}
+
+	query := makeSignedAppProxyQuery(apiSecret)
+	resp2, err := http.Get(srv.URL + "/app/ping?" + query)
+	if err != nil {
+		t.Fatalf("GET /app/ping signed: %v", err)
+	}
+	defer resp2.Body.Close()
+	if resp2.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp2.Body)
+		t.Fatalf("signed status: got %d, want %d; body=%s", resp2.StatusCode, http.StatusOK, string(body))
+	}
+
+	badQuery := strings.Replace(query, "signature=", "signature=bad", 1)
+	resp3, err := http.Get(srv.URL + "/app/ping?" + badQuery)
+	if err != nil {
+		t.Fatalf("GET /app/ping bad signature: %v", err)
+	}
+	defer resp3.Body.Close()
+	if resp3.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("bad signature status: got %d, want %d", resp3.StatusCode, http.StatusUnauthorized)
 	}
 }

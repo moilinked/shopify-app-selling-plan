@@ -26,7 +26,7 @@ pong
 
 When the config file contains `shopify_api_key` and `shopify_api_secret`, the app enables:
 
-- `GET /protected/ping`
+- `GET /admin/ping`
 
 The route expects:
 
@@ -41,6 +41,13 @@ The middleware validates:
 On successful validation, the server logs JWT claims:
 
 - `shopify_session_token claims=...`
+
+### Auth debug switch
+
+Use `debug_auth` in `config/config.yaml` to control auth debug logs:
+
+- `true`: print detailed JWT and app proxy HMAC validation logs
+- `false`: keep auth middleware logs quiet
 
 ### Project layout
 

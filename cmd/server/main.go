@@ -7,7 +7,10 @@ import (
 	"time"
 
 	"shopify-app-authentication/internal/config"
+	"shopify-app-authentication/internal/database"
 	"shopify-app-authentication/internal/httpapi"
+
+	"gorm.io/gorm"
 )
 
 func main() {
@@ -19,9 +22,18 @@ func main() {
 		log.Fatalf("load config: %v", err)
 	}
 
+	var db *gorm.DB
+	if !cfg.Database.IsEmpty() {
+		var err error
+		db, err = database.Connect(cfg.Database.DSN())
+		if err != nil {
+			log.Fatalf("connect database: %v", err)
+		}
+	}
+
 	srv := &http.Server{
 		Addr:              ":" + cfg.Port,
-		Handler:           httpapi.NewRouter(cfg),
+		Handler:           httpapi.NewRouter(cfg, db),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 

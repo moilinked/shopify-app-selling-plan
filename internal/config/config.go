@@ -2,17 +2,39 @@ package config
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"strings"
 
 	"gopkg.in/yaml.v3"
 )
 
+type DatabaseConfig struct {
+	Host     string `yaml:"host"`
+	Port     string `yaml:"port"`
+	User     string `yaml:"user"`
+	Password string `yaml:"password"`
+	DBName   string `yaml:"dbname"`
+	SSLMode  string `yaml:"sslmode"`
+}
+
+func (d DatabaseConfig) DSN() string {
+	return fmt.Sprintf(
+		"host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
+		d.Host, d.Port, d.User, d.Password, d.DBName, d.SSLMode,
+	)
+}
+
+func (d DatabaseConfig) IsEmpty() bool {
+	return d.Host == ""
+}
+
 type Config struct {
-	Port             string `yaml:"port"`
-	ShopifyAPIKey    string `yaml:"shopify_api_key"`
-	ShopifyAPISecret string `yaml:"shopify_api_secret"`
-	DebugAuth        bool   `yaml:"debug_auth"`
+	Port             string         `yaml:"port"`
+	ShopifyAPIKey    string         `yaml:"shopify_api_key"`
+	ShopifyAPISecret string         `yaml:"shopify_api_secret"`
+	DebugAuth        bool           `yaml:"debug_auth"`
+	Database         DatabaseConfig `yaml:"database"`
 }
 
 func Load(path string) (Config, error) {

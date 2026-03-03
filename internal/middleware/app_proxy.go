@@ -1,4 +1,4 @@
-package httpapi
+package middleware
 
 import (
 	"crypto/hmac"
@@ -11,6 +11,9 @@ import (
 	"strings"
 )
 
+// ShopifyAppProxySignatureMiddleware validates the Shopify app proxy HMAC
+// signature. On success it reconciles the shop domain from query params
+// with the header-based shop in the request context.
 func ShopifyAppProxySignatureMiddleware(apiSecret string, debugAuth bool) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -57,8 +60,8 @@ func ShopifyAppProxySignatureMiddleware(apiSecret string, debugAuth bool) func(h
 			values.Del("signature")
 			values.Del("hmac")
 
-			message := canonicalizeProxyParams(values)
-			expected := computeSHA256HMACHex(message, apiSecret)
+			message := CanonicalizeProxyParams(values)
+			expected := ComputeSHA256HMACHex(message, apiSecret)
 			if !hmac.Equal([]byte(strings.ToLower(signature)), []byte(expected)) {
 				if debugAuth {
 					log.Printf(
@@ -77,7 +80,14 @@ func ShopifyAppProxySignatureMiddleware(apiSecret string, debugAuth bool) func(h
 			if debugAuth {
 				log.Printf("app_proxy_hmac: verified path=%s source=%s keys=%d", requestPath, payloadSource, len(values))
 			}
-			next.ServeHTTP(w, r)
+
+			ctx := r.Context()
+			if shopParam := strings.TrimSpace(values.Get("shop")); shopParam != "" {
+				if shopDomain, err := extractShopDomain(shopParam); err == nil {
+					ctx = reconcileShopContext(ctx, shopDomain)
+				}
+			}
+			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
 }
@@ -89,7 +99,8 @@ func shortHex(s string) string {
 	return s[:8]
 }
 
-func canonicalizeProxyParams(values url.Values) string {
+// CanonicalizeProxyParams builds the canonical string for HMAC verification.
+func CanonicalizeProxyParams(values url.Values) string {
 	pairs := make([]string, 0, len(values))
 	for key, vals := range values {
 		pairs = append(pairs, key+"="+strings.Join(vals, ","))
@@ -98,7 +109,8 @@ func canonicalizeProxyParams(values url.Values) string {
 	return strings.Join(pairs, "")
 }
 
-func computeSHA256HMACHex(message, secret string) string {
+// ComputeSHA256HMACHex returns the hex-encoded HMAC-SHA256 of message with the given secret.
+func ComputeSHA256HMACHex(message, secret string) string {
 	mac := hmac.New(sha256.New, []byte(secret))
 	_, _ = mac.Write([]byte(message))
 	return hex.EncodeToString(mac.Sum(nil))

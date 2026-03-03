@@ -1,4 +1,4 @@
-package httpapi
+package middleware
 
 import (
 	"context"
@@ -30,6 +30,9 @@ func hostFromIssuer(issuer string) string {
 	return parts[0]
 }
 
+// ShopifySessionTokenMiddleware validates the Shopify session token (JWT)
+// from the Authorization header. On success it stores the claims and
+// the resolved shop domain in the request context.
 func ShopifySessionTokenMiddleware(apiKey, apiSecret string, debugAuth bool) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -128,6 +131,7 @@ func ShopifySessionTokenMiddleware(apiKey, apiSecret string, debugAuth bool) fun
 				LogClaims(claims)
 			}
 			ctx := context.WithValue(r.Context(), shopifyClaimsContextKey, claims)
+			ctx = reconcileShopContext(ctx, destHost)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}

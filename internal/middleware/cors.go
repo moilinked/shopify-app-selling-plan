@@ -2,7 +2,8 @@ package middleware
 
 import "net/http"
 
-// AllowAllCORS permits all cross-origin requests.
+// AllowAllCORS 允许所有跨域请求（开发/测试用）。
+// 对 OPTIONS 预检请求直接返回 204，不转发到后续 handler。
 func AllowAllCORS(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		origin := r.Header.Get("Origin")

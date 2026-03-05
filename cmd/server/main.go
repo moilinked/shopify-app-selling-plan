@@ -26,6 +26,7 @@ func main() {
 		logger.Log.Fatal().Err(err).Msg("init logger")
 	}
 
+	// 仅在配置了数据库信息时才连接
 	var db *gorm.DB
 	if !cfg.Database.IsEmpty() {
 		var err error

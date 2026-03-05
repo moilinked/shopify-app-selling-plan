@@ -16,7 +16,7 @@ type ShopHandler struct {
 	DB *gorm.DB
 }
 
-// Routes registers CRUD routes for shop management under /admin/shops.
+// Routes 注册店铺资源的 RESTful 路由。
 func (h *ShopHandler) Routes() chi.Router {
 	r := chi.NewRouter()
 	r.Get("/", h.List)
@@ -27,7 +27,7 @@ func (h *ShopHandler) Routes() chi.Router {
 	return r
 }
 
-// List returns all shops. GET /admin/shops
+// List 查询全部店铺列表。 GET /admin/shops
 func (h *ShopHandler) List(w http.ResponseWriter, r *http.Request) {
 	var shops []models.Shop
 	if err := h.DB.Find(&shops).Error; err != nil {
@@ -37,7 +37,7 @@ func (h *ShopHandler) List(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, shops)
 }
 
-// Create adds a new shop. POST /admin/shops
+// Create 新增一个店铺。 POST /admin/shops
 func (h *ShopHandler) Create(w http.ResponseWriter, r *http.Request) {
 	var shop models.Shop
 	if err := json.NewDecoder(r.Body).Decode(&shop); err != nil {
@@ -57,7 +57,7 @@ func (h *ShopHandler) Create(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, shop)
 }
 
-// Get returns a single shop by ID. GET /admin/shops/{id}
+// Get 根据 ID 查询单个店铺。 GET /admin/shops/{id}
 func (h *ShopHandler) Get(w http.ResponseWriter, r *http.Request) {
 	id, err := uuid.Parse(chi.URLParam(r, "id"))
 	if err != nil {
@@ -77,7 +77,7 @@ func (h *ShopHandler) Get(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, shop)
 }
 
-// Update modifies an existing shop by ID. PUT /admin/shops/{id}
+// Update 根据 ID 更新店铺信息。 PUT /admin/shops/{id}
 func (h *ShopHandler) Update(w http.ResponseWriter, r *http.Request) {
 	id, err := uuid.Parse(chi.URLParam(r, "id"))
 	if err != nil {
@@ -113,7 +113,7 @@ func (h *ShopHandler) Update(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, shop)
 }
 
-// Delete soft-deletes a shop by ID. DELETE /admin/shops/{id}
+// Delete 根据 ID 软删除店铺。 DELETE /admin/shops/{id}
 func (h *ShopHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	id, err := uuid.Parse(chi.URLParam(r, "id"))
 	if err != nil {
@@ -133,6 +133,7 @@ func (h *ShopHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"message": "deleted"})
 }
 
+// writeJSON 将数据序列化为 JSON 并写入响应。
 func writeJSON(w http.ResponseWriter, status int, data interface{}) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(status)

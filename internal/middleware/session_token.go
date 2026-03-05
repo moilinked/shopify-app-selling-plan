@@ -11,13 +11,15 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
-// ShopifySessionTokenMiddleware validates the Shopify session token (JWT)
-// from the Authorization header. On success it stores the claims and
-// the resolved shop domain in the request context.
+// ShopifySessionTokenMiddleware 校验前端通过 Authorization: Bearer 发送的 Shopify Session Token（JWT）。
+// 校验项包括：HS256 签名、exp/nbf（带 5 秒容差）、aud、iss 与 dest 域名一致性。
+// 校验通过后将 claims 和解析出的店铺域名写入请求上下文。
 func ShopifySessionTokenMiddleware(apiKey, apiSecret string, debugAuth bool) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			requestPath := r.URL.Path
+
+			// 1. 提取 Authorization 头中的 Bearer Token
 			authHeader := strings.TrimSpace(r.Header.Get("Authorization"))
 			if authHeader == "" {
 				if debugAuth {
@@ -45,6 +47,7 @@ func ShopifySessionTokenMiddleware(apiKey, apiSecret string, debugAuth bool) fun
 				return
 			}
 
+			// 2. 解析并验签 JWT（HS256，5 秒时钟容差）
 			const tokenLeeway = 5 * time.Second
 			claims := jwt.MapClaims{}
 			parser := jwt.NewParser(
@@ -64,6 +67,7 @@ func ShopifySessionTokenMiddleware(apiKey, apiSecret string, debugAuth bool) fun
 				return
 			}
 
+			// 3. 校验 aud 是否为当前应用的 API Key
 			aud, err := claims.GetAudience()
 			if err != nil || len(aud) == 0 || aud[0] != apiKey {
 				if debugAuth {
@@ -75,6 +79,7 @@ func ShopifySessionTokenMiddleware(apiKey, apiSecret string, debugAuth bool) fun
 				return
 			}
 
+			// 4. 校验 iss 存在
 			iss, err := claims.GetIssuer()
 			if err != nil || iss == "" {
 				if debugAuth {
@@ -84,6 +89,7 @@ func ShopifySessionTokenMiddleware(apiKey, apiSecret string, debugAuth bool) fun
 				return
 			}
 
+			// 5. 校验 dest 存在且合法
 			destRaw, ok := claims["dest"]
 			if !ok {
 				if debugAuth {
@@ -102,6 +108,7 @@ func ShopifySessionTokenMiddleware(apiKey, apiSecret string, debugAuth bool) fun
 				return
 			}
 
+			// 6. 校验 iss 和 dest 的顶级域名一致（防止跨店伪造）
 			issHost := hostFromIssuer(iss)
 			destHost, err := extractShopDomain(dest)
 			if err != nil || issHost == "" || destHost == "" || issHost != destHost {
@@ -120,6 +127,8 @@ func ShopifySessionTokenMiddleware(apiKey, apiSecret string, debugAuth bool) fun
 					Msg("session_jwt: verified")
 				LogClaims(claims)
 			}
+
+			// 7. 将 claims 和店铺域名写入上下文
 			ctx := context.WithValue(r.Context(), shopifyClaimsContextKey, claims)
 			ctx = reconcileShopContext(ctx, destHost)
 			next.ServeHTTP(w, r.WithContext(ctx))

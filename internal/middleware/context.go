@@ -19,26 +19,26 @@ const (
 	shopContextKey          = contextKey("shop")
 )
 
-// ShopFromContext retrieves the shop domain from the request context.
+// ShopFromContext 从请求上下文中取出已验证的店铺域名。
 func ShopFromContext(ctx context.Context) (string, bool) {
 	shop, ok := ctx.Value(shopContextKey).(string)
 	return shop, ok && shop != ""
 }
 
-// ClaimsFromContext retrieves the Shopify JWT claims from the request context.
+// ClaimsFromContext 从请求上下文中取出 Shopify JWT 的 claims。
 func ClaimsFromContext(ctx context.Context) (jwt.MapClaims, bool) {
 	claims, ok := ctx.Value(shopifyClaimsContextKey).(jwt.MapClaims)
 	return claims, ok
 }
 
-// LogClaims logs the Shopify session token claims as JSON.
+// LogClaims 以 JSON 格式记录 Shopify Session Token 的完整 claims（debug 级别）。
 func LogClaims(claims jwt.MapClaims) {
 	claimsJSON, _ := json.Marshal(claims)
 	logger.Log.Debug().RawJSON("claims", claimsJSON).Msg("shopify_session_token")
 }
 
-// ShopContextMiddleware extracts the shop domain from request headers
-// (X-Shop-Domain or Shop) and stores it in the request context.
+// ShopContextMiddleware 从请求头 X-Shop-Domain 或 Shop 中提取店铺域名，
+// 并存入请求上下文，供后续 handler 使用。
 func ShopContextMiddleware() func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -52,6 +52,7 @@ func ShopContextMiddleware() func(http.Handler) http.Handler {
 	}
 }
 
+// extractShopDomain 去除协议前缀和尾部斜杠，返回小写的店铺域名。
 func extractShopDomain(shopURL string) (string, error) {
 	shopURL = strings.TrimSpace(shopURL)
 	shopURL = strings.TrimPrefix(shopURL, "https://")
@@ -63,6 +64,7 @@ func extractShopDomain(shopURL string) (string, error) {
 	return strings.ToLower(shopURL), nil
 }
 
+// hostFromIssuer 从 JWT iss 字段中提取主机名部分（去除路径和协议）。
 func hostFromIssuer(issuer string) string {
 	issuer = strings.TrimSpace(strings.ToLower(issuer))
 	issuer = strings.TrimPrefix(issuer, "https://")
@@ -71,6 +73,7 @@ func hostFromIssuer(issuer string) string {
 	return parts[0]
 }
 
+// shopFromHeader 优先从 X-Shop-Domain 头读取店铺域名，其次从 Shop 头读取。
 func shopFromHeader(r *http.Request) string {
 	shop := strings.TrimSpace(r.Header.Get("X-Shop-Domain"))
 	if shop == "" {
@@ -86,8 +89,8 @@ func shopFromHeader(r *http.Request) string {
 	return domain
 }
 
-// reconcileShopContext sets the auth-resolved shop in context.
-// If the header-based shop already in context doesn't match, shop is removed.
+// reconcileShopContext 对比鉴权后解析出的店铺域名与请求头中的店铺域名。
+// 如果两者不一致则清空上下文中的店铺信息，防止伪造。
 func reconcileShopContext(ctx context.Context, authShop string) context.Context {
 	headerShop, hasHeader := ShopFromContext(ctx)
 	if hasHeader && headerShop != authShop {

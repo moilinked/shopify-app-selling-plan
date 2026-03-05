@@ -6,7 +6,7 @@ import (
 	mw "shopify-app-authentication/internal/middleware"
 )
 
-// HandlePing responds to GET /ping with the current shop context.
+// HandlePing 处理 GET /ping，返回当前店铺上下文（公开接口，无需鉴权）。
 func HandlePing(w http.ResponseWriter, r *http.Request) {
 	shop, _ := mw.ShopFromContext(r.Context())
 	writeJSON(w, http.StatusOK, map[string]interface{}{
@@ -15,7 +15,7 @@ func HandlePing(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// HandleAdminPing responds to GET /admin/ping with the shop context and JWT claims.
+// HandleAdminPing 处理 GET /admin/ping，返回店铺上下文和 JWT claims（需 Session Token 鉴权）。
 func HandleAdminPing(w http.ResponseWriter, r *http.Request) {
 	shop, _ := mw.ShopFromContext(r.Context())
 	claims, _ := mw.ClaimsFromContext(r.Context())
@@ -26,7 +26,7 @@ func HandleAdminPing(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// HandleAppPing responds to GET /app/ping with the shop context (app proxy).
+// HandleAppPing 处理 GET /app/ping，返回店铺上下文（需 App Proxy HMAC 签名校验）。
 func HandleAppPing(w http.ResponseWriter, r *http.Request) {
 	shop, _ := mw.ShopFromContext(r.Context())
 	writeJSON(w, http.StatusOK, map[string]interface{}{

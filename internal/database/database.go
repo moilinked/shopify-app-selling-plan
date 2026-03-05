@@ -2,14 +2,15 @@ package database
 
 import (
 	"fmt"
-	"log"
 
+	"shopify-app-authentication/internal/logger"
 	"shopify-app-authentication/internal/models"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
 
+// Connect 使用 DSN 连接 PostgreSQL 并自动迁移表结构。
 func Connect(dsn string) (*gorm.DB, error) {
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
@@ -20,6 +21,6 @@ func Connect(dsn string) (*gorm.DB, error) {
 		return nil, fmt.Errorf("failed to auto-migrate: %w", err)
 	}
 
-	log.Println("database connected and migrated successfully")
+	logger.Log.Info().Msg("database connected and migrated successfully")
 	return db, nil
 }

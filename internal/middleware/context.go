@@ -3,9 +3,11 @@ package middleware
 import (
 	"context"
 	"encoding/json"
-	"log"
+	"errors"
 	"net/http"
 	"strings"
+
+	"shopify-app-authentication/internal/logger"
 
 	"github.com/golang-jwt/jwt/v5"
 )
@@ -32,7 +34,7 @@ func ClaimsFromContext(ctx context.Context) (jwt.MapClaims, bool) {
 // LogClaims logs the Shopify session token claims as JSON.
 func LogClaims(claims jwt.MapClaims) {
 	claimsJSON, _ := json.Marshal(claims)
-	log.Printf("shopify_session_token claims=%s", claimsJSON)
+	logger.Log.Debug().RawJSON("claims", claimsJSON).Msg("shopify_session_token")
 }
 
 // ShopContextMiddleware extracts the shop domain from request headers
@@ -48,6 +50,25 @@ func ShopContextMiddleware() func(http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 		})
 	}
+}
+
+func extractShopDomain(shopURL string) (string, error) {
+	shopURL = strings.TrimSpace(shopURL)
+	shopURL = strings.TrimPrefix(shopURL, "https://")
+	shopURL = strings.TrimPrefix(shopURL, "http://")
+	shopURL = strings.TrimSuffix(shopURL, "/")
+	if shopURL == "" {
+		return "", errors.New("empty shop domain")
+	}
+	return strings.ToLower(shopURL), nil
+}
+
+func hostFromIssuer(issuer string) string {
+	issuer = strings.TrimSpace(strings.ToLower(issuer))
+	issuer = strings.TrimPrefix(issuer, "https://")
+	issuer = strings.TrimPrefix(issuer, "http://")
+	parts := strings.SplitN(issuer, "/", 2)
+	return parts[0]
 }
 
 func shopFromHeader(r *http.Request) string {

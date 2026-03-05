@@ -4,11 +4,12 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
-	"log"
 	"net/http"
 	"net/url"
 	"sort"
 	"strings"
+
+	"shopify-app-authentication/internal/logger"
 )
 
 // ShopifyAppProxySignatureMiddleware validates the Shopify app proxy HMAC
@@ -26,7 +27,7 @@ func ShopifyAppProxySignatureMiddleware(apiSecret string, debugAuth bool) func(h
 			}
 			if queryString == "" {
 				if debugAuth {
-					log.Printf("app_proxy_hmac: missing payload path=%s", requestPath)
+					logger.Log.Debug().Str("path", requestPath).Msg("app_proxy_hmac: missing payload")
 				}
 				http.Error(w, "missing hmac payload", http.StatusUnauthorized)
 				return
@@ -39,7 +40,8 @@ func ShopifyAppProxySignatureMiddleware(apiSecret string, debugAuth bool) func(h
 			values, err := url.ParseQuery(queryString)
 			if err != nil {
 				if debugAuth {
-					log.Printf("app_proxy_hmac: parse payload failed path=%s source=%s err=%v", requestPath, payloadSource, err)
+					logger.Log.Warn().Str("path", requestPath).Str("source", payloadSource).Err(err).
+						Msg("app_proxy_hmac: parse payload failed")
 				}
 				http.Error(w, "invalid hmac payload", http.StatusUnauthorized)
 				return
@@ -51,7 +53,8 @@ func ShopifyAppProxySignatureMiddleware(apiSecret string, debugAuth bool) func(h
 			}
 			if signature == "" {
 				if debugAuth {
-					log.Printf("app_proxy_hmac: missing signature path=%s source=%s", requestPath, payloadSource)
+					logger.Log.Debug().Str("path", requestPath).Str("source", payloadSource).
+						Msg("app_proxy_hmac: missing signature")
 				}
 				http.Error(w, "missing signature", http.StatusUnauthorized)
 				return
@@ -64,21 +67,18 @@ func ShopifyAppProxySignatureMiddleware(apiSecret string, debugAuth bool) func(h
 			expected := ComputeSHA256HMACHex(message, apiSecret)
 			if !hmac.Equal([]byte(strings.ToLower(signature)), []byte(expected)) {
 				if debugAuth {
-					log.Printf(
-						"app_proxy_hmac: signature mismatch path=%s source=%s keys=%d got_prefix=%s expected_prefix=%s",
-						requestPath,
-						payloadSource,
-						len(values),
-						shortHex(signature),
-						shortHex(expected),
-					)
+					logger.Log.Warn().Str("path", requestPath).Str("source", payloadSource).
+						Int("keys", len(values)).
+						Str("got_prefix", shortHex(signature)).Str("expected_prefix", shortHex(expected)).
+						Msg("app_proxy_hmac: signature mismatch")
 				}
 				http.Error(w, "invalid signature", http.StatusUnauthorized)
 				return
 			}
 
 			if debugAuth {
-				log.Printf("app_proxy_hmac: verified path=%s source=%s keys=%d", requestPath, payloadSource, len(values))
+				logger.Log.Info().Str("path", requestPath).Str("source", payloadSource).
+					Int("keys", len(values)).Msg("app_proxy_hmac: verified")
 			}
 
 			ctx := r.Context()

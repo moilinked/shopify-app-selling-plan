@@ -16,7 +16,7 @@ func NewRouter(cfg config.Config, db *gorm.DB) http.Handler {
 	r.Use(mw.AllowAllCORS)
 	r.Use(middleware.RequestID)
 	r.Use(middleware.RealIP)
-	r.Use(middleware.Logger)
+	r.Use(mw.RequestLogger)
 	r.Use(middleware.Recoverer)
 	r.Use(mw.ShopContextMiddleware())
 

@@ -2,13 +2,13 @@ package main
 
 import (
 	"flag"
-	"log"
 	"net/http"
 	"time"
 
 	"shopify-app-authentication/internal/config"
 	"shopify-app-authentication/internal/database"
 	"shopify-app-authentication/internal/httpapi"
+	"shopify-app-authentication/internal/logger"
 
 	"gorm.io/gorm"
 )
@@ -19,7 +19,11 @@ func main() {
 
 	cfg, err := config.Load(*configPath)
 	if err != nil {
-		log.Fatalf("load config: %v", err)
+		logger.Log.Fatal().Err(err).Msg("load config")
+	}
+
+	if err := logger.Init(cfg.LogLevel); err != nil {
+		logger.Log.Fatal().Err(err).Msg("init logger")
 	}
 
 	var db *gorm.DB
@@ -27,7 +31,7 @@ func main() {
 		var err error
 		db, err = database.Connect(cfg.Database.DSN())
 		if err != nil {
-			log.Fatalf("connect database: %v", err)
+			logger.Log.Fatal().Err(err).Msg("connect database")
 		}
 	}
 
@@ -37,8 +41,8 @@ func main() {
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 
-	log.Printf("listening on http://localhost:%s", cfg.Port)
+	logger.Log.Info().Str("addr", ":"+cfg.Port).Msgf("listening on http://localhost:%s", cfg.Port)
 	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-		log.Fatalf("server error: %v", err)
+		logger.Log.Fatal().Err(err).Msg("server error")
 	}
 }

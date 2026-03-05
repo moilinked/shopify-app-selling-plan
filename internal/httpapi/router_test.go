@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"io"
-	"log"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -13,9 +12,11 @@ import (
 	"time"
 
 	"shopify-app-authentication/internal/config"
+	"shopify-app-authentication/internal/logger"
 	mw "shopify-app-authentication/internal/middleware"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/rs/zerolog"
 )
 
 func newTestServer(t *testing.T, cfg config.Config) *httptest.Server {
@@ -115,6 +116,7 @@ func TestCORSPreflight(t *testing.T) {
 	if err != nil {
 		t.Fatalf("new request: %v", err)
 	}
+	req.Header.Set("Access-Control-Request-Headers", "Authorization, Content-Type")
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -182,9 +184,9 @@ func TestAdminPingReturnsShopFromJWT(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	originalWriter := log.Writer()
-	log.SetOutput(&buf)
-	t.Cleanup(func() { log.SetOutput(originalWriter) })
+	saved := logger.Log
+	logger.Log = zerolog.New(&buf)
+	t.Cleanup(func() { logger.Log = saved })
 
 	srv := newTestServer(t, cfg)
 
@@ -210,7 +212,7 @@ func TestAdminPingReturnsShopFromJWT(t *testing.T) {
 	}
 
 	logOutput := buf.String()
-	if !strings.Contains(logOutput, "shopify_session_token claims=") {
+	if !strings.Contains(logOutput, "shopify_session_token") {
 		t.Fatalf("expected claims log, got %q", logOutput)
 	}
 }

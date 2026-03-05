@@ -2,33 +2,14 @@ package middleware
 
 import (
 	"context"
-	"errors"
-	"log"
 	"net/http"
 	"strings"
 	"time"
 
+	"shopify-app-authentication/internal/logger"
+
 	"github.com/golang-jwt/jwt/v5"
 )
-
-func extractShopDomain(shopURL string) (string, error) {
-	shopURL = strings.TrimSpace(shopURL)
-	shopURL = strings.TrimPrefix(shopURL, "https://")
-	shopURL = strings.TrimPrefix(shopURL, "http://")
-	shopURL = strings.TrimSuffix(shopURL, "/")
-	if shopURL == "" {
-		return "", errors.New("empty shop domain")
-	}
-	return strings.ToLower(shopURL), nil
-}
-
-func hostFromIssuer(issuer string) string {
-	issuer = strings.TrimSpace(strings.ToLower(issuer))
-	issuer = strings.TrimPrefix(issuer, "https://")
-	issuer = strings.TrimPrefix(issuer, "http://")
-	parts := strings.SplitN(issuer, "/", 2)
-	return parts[0]
-}
 
 // ShopifySessionTokenMiddleware validates the Shopify session token (JWT)
 // from the Authorization header. On success it stores the claims and
@@ -40,7 +21,7 @@ func ShopifySessionTokenMiddleware(apiKey, apiSecret string, debugAuth bool) fun
 			authHeader := strings.TrimSpace(r.Header.Get("Authorization"))
 			if authHeader == "" {
 				if debugAuth {
-					log.Printf("session_jwt: missing Authorization header path=%s", requestPath)
+					logger.Log.Debug().Str("path", requestPath).Msg("session_jwt: missing Authorization header")
 				}
 				http.Error(w, "missing Authorization header", http.StatusUnauthorized)
 				return
@@ -49,7 +30,7 @@ func ShopifySessionTokenMiddleware(apiKey, apiSecret string, debugAuth bool) fun
 			const bearerPrefix = "Bearer "
 			if !strings.HasPrefix(authHeader, bearerPrefix) {
 				if debugAuth {
-					log.Printf("session_jwt: invalid Authorization format path=%s", requestPath)
+					logger.Log.Debug().Str("path", requestPath).Msg("session_jwt: invalid Authorization format")
 				}
 				http.Error(w, "invalid Authorization header format", http.StatusUnauthorized)
 				return
@@ -58,7 +39,7 @@ func ShopifySessionTokenMiddleware(apiKey, apiSecret string, debugAuth bool) fun
 			tokenString := strings.TrimSpace(strings.TrimPrefix(authHeader, bearerPrefix))
 			if tokenString == "" {
 				if debugAuth {
-					log.Printf("session_jwt: missing bearer token path=%s", requestPath)
+					logger.Log.Debug().Str("path", requestPath).Msg("session_jwt: missing bearer token")
 				}
 				http.Error(w, "missing bearer token", http.StatusUnauthorized)
 				return
@@ -75,7 +56,9 @@ func ShopifySessionTokenMiddleware(apiKey, apiSecret string, debugAuth bool) fun
 			})
 			if err != nil || !token.Valid {
 				if debugAuth {
-					log.Printf("session_jwt: parse/verify failed path=%s err=%v token_valid=%t", requestPath, err, token != nil && token.Valid)
+					logger.Log.Warn().Str("path", requestPath).Err(err).
+						Bool("token_valid", token != nil && token.Valid).
+						Msg("session_jwt: parse/verify failed")
 				}
 				http.Error(w, "invalid session token", http.StatusUnauthorized)
 				return
@@ -84,7 +67,9 @@ func ShopifySessionTokenMiddleware(apiKey, apiSecret string, debugAuth bool) fun
 			aud, err := claims.GetAudience()
 			if err != nil || len(aud) == 0 || aud[0] != apiKey {
 				if debugAuth {
-					log.Printf("session_jwt: invalid audience path=%s aud=%v expected=%s err=%v", requestPath, aud, apiKey, err)
+					logger.Log.Warn().Str("path", requestPath).
+						Strs("aud", aud).Str("expected", apiKey).Err(err).
+						Msg("session_jwt: invalid audience")
 				}
 				http.Error(w, "invalid token audience", http.StatusUnauthorized)
 				return
@@ -93,7 +78,7 @@ func ShopifySessionTokenMiddleware(apiKey, apiSecret string, debugAuth bool) fun
 			iss, err := claims.GetIssuer()
 			if err != nil || iss == "" {
 				if debugAuth {
-					log.Printf("session_jwt: missing issuer path=%s err=%v", requestPath, err)
+					logger.Log.Warn().Str("path", requestPath).Err(err).Msg("session_jwt: missing issuer")
 				}
 				http.Error(w, "missing issuer", http.StatusUnauthorized)
 				return
@@ -102,7 +87,7 @@ func ShopifySessionTokenMiddleware(apiKey, apiSecret string, debugAuth bool) fun
 			destRaw, ok := claims["dest"]
 			if !ok {
 				if debugAuth {
-					log.Printf("session_jwt: missing destination claim path=%s", requestPath)
+					logger.Log.Warn().Str("path", requestPath).Msg("session_jwt: missing destination claim")
 				}
 				http.Error(w, "missing destination", http.StatusUnauthorized)
 				return
@@ -110,7 +95,8 @@ func ShopifySessionTokenMiddleware(apiKey, apiSecret string, debugAuth bool) fun
 			dest, ok := destRaw.(string)
 			if !ok || strings.TrimSpace(dest) == "" {
 				if debugAuth {
-					log.Printf("session_jwt: invalid destination claim path=%s dest=%v", requestPath, destRaw)
+					logger.Log.Warn().Str("path", requestPath).Interface("dest", destRaw).
+						Msg("session_jwt: invalid destination claim")
 				}
 				http.Error(w, "invalid destination", http.StatusUnauthorized)
 				return
@@ -120,14 +106,18 @@ func ShopifySessionTokenMiddleware(apiKey, apiSecret string, debugAuth bool) fun
 			destHost, err := extractShopDomain(dest)
 			if err != nil || issHost == "" || destHost == "" || issHost != destHost {
 				if debugAuth {
-					log.Printf("session_jwt: issuer/dest mismatch path=%s iss_host=%s dest_host=%s err=%v", requestPath, issHost, destHost, err)
+					logger.Log.Warn().Str("path", requestPath).
+						Str("iss_host", issHost).Str("dest_host", destHost).Err(err).
+						Msg("session_jwt: issuer/dest mismatch")
 				}
 				http.Error(w, "issuer and destination mismatch", http.StatusUnauthorized)
 				return
 			}
 
 			if debugAuth {
-				log.Printf("session_jwt: verified path=%s iss=%s dest=%s sub=%v", requestPath, issHost, destHost, claims["sub"])
+				logger.Log.Info().Str("path", requestPath).
+					Str("iss", issHost).Str("dest", destHost).Interface("sub", claims["sub"]).
+					Msg("session_jwt: verified")
 				LogClaims(claims)
 			}
 			ctx := context.WithValue(r.Context(), shopifyClaimsContextKey, claims)

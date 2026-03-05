@@ -34,6 +34,7 @@ type Config struct {
 	ShopifyAPIKey    string         `yaml:"shopify_api_key"`
 	ShopifyAPISecret string         `yaml:"shopify_api_secret"`
 	DebugAuth        bool           `yaml:"debug_auth"`
+	LogLevel         string         `yaml:"log_level"`
 	Database         DatabaseConfig `yaml:"database"`
 }
 
@@ -57,6 +58,11 @@ func Load(path string) (Config, error) {
 	cfg.ShopifyAPISecret = strings.TrimSpace(cfg.ShopifyAPISecret)
 	if cfg.ShopifyAPIKey == "" || cfg.ShopifyAPISecret == "" {
 		return Config{}, errors.New("shopify_api_key and shopify_api_secret are required")
+	}
+
+	cfg.LogLevel = strings.TrimSpace(strings.ToLower(cfg.LogLevel))
+	if cfg.LogLevel == "" {
+		cfg.LogLevel = "info"
 	}
 
 	return cfg, nil
